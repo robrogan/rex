@@ -1,0 +1,37 @@
+# Supabase CLI config (local dev). Hosted-project users can ignore this file and
+# apply migrations via the dashboard SQL editor — see docs/SUPABASE_SETUP.md.
+project_id = "recs-app"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# Local redirect target; add your real scheme/site for hosted.
+site_url = "recsapp://"
+additional_redirect_urls = ["recsapp://"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# OTP (6-digit code) instead of magic links — most reliable in Expo Go.
+enable_confirmations = false
+otp_length = 6
+otp_expiry = 3600
+
+[functions.push-fanout]
+enabled = true
+verify_jwt = false
