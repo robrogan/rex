@@ -4,7 +4,7 @@
 |---|---|---|
 | A1 Scaffold | ✅ Done 2026-07-18 | Expo SDK 57, expo-router, TS strict, theme tokens from Figma, S1–S12 placeholder routes, eas.json (dev/preview/prod), ESLint+Prettier. Verified: tsc clean, eslint clean, `expo export --platform web` bundles all routes. App name/slug placeholder "Recs App (working title)" pending D1. |
 | A2 Design system | ⬜ Not started (code) | Component code not begun (`src/components/` has only `Screen.tsx`). **Figma reference is now ready** (2026-07-19): `MVP Drafts` page + `mvp/*` kit + `description` token — build the A2 components to match it. See "Design reference (Figma)" below. |
-| A3 Backend | 🟨 Code done 2026-07-19 · needs live project | SQL migrations (schema/RLS/triggers), seed (2 users + 5 books), `push-fanout` Edge Function stub, `config.toml`; client wiring `lib/supabase.ts` + `lib/auth.tsx` (email OTP) + React Query + typed `types/database.ts`; functional OTP sign-in. Verified vs Postgres 16: 21/21 checks — migrations apply, triggers fire, RLS isolates users (A can't read B's rows), dedupe + notification fan-out work. **Remaining (needs Rob):** create the free Supabase project, set `.env`, apply migrations + seed. See `docs/SUPABASE_SETUP.md`. |
+| A3 Backend | ✅ Done 2026-07-19 | SQL migrations (schema/RLS/triggers/hardening), seed (2 users + 5 books), `push-fanout` Edge Function stub, `config.toml`; client wiring `lib/supabase.ts` + `lib/auth.tsx` (email OTP) + React Query + typed `types/database.ts`; functional OTP sign-in. **Live Supabase project connected** (ref `mipdevkjokgaamnulqvr`), migrations 1-5 + seed applied directly via the Supabase MCP and verified (row counts match seed exactly, triggers fire). Test logins in `recs-app/TEST_LOGINS.local.md` (gitignored, not in repo — ask Rob if you need them). See "Supabase backend connected & hardened" below. |
 | A4 Search/detail | ⬜ | |
 | A5 Friends/send | ⬜ | |
 | A6 TBR/status | ⬜ | |
@@ -28,3 +28,20 @@ Figma **screen drafts** (DEFERRED_TASKS #3, not A2) are done. This is the visual
 - **Card/row outlines** in the drafts are **translucent violet** (`font` @ ~40–55% opacity), a pale lavender — `theme.ts` currently sets `cardOutline: '#F5C4DE'` (pink). Match Figma unless Rob prefers pink.
 - **`description` type** renders at **16/24** in the drafts vs `type.description` = 18 in `theme.ts`; align the size.
 - `theme.ts` `success`/`info` (`#00FF00`/`#0000FF`) are placeholders, not from the Figma variable set.
+
+---
+
+## Supabase backend connected & hardened — added 2026-07-19
+
+The A3 backend went from "code done, needs a live project" to fully connected and verified.
+
+- **Project:** `mipdevkjokgaamnulqvr` (matches `EXPO_PUBLIC_SUPABASE_URL` in `.env`). Connected via the Supabase MCP server (already configured in root `.mcp.json`); OAuth was a one-time browser approval.
+- **Applied directly to the live project** (and mirrored to `supabase/migrations/` + `supabase/setup.sql` on disk so a fresh project can reproduce this exactly): migrations `...000001_schema` → `...000003_rls` as originally written, plus two new hardening migrations, `...000004_security_hardening` and `...000005_revoke_anon_authenticated_execute`, then `seed.sql`.
+- **Verified:** row counts match `seed.sql` exactly (2 users, 1 friendship, 5 items, 3 recommendations, 3 rec_status, 2 notifications); `pg_policies` confirms all 15 RLS policies exist post-hardening.
+- **Why the hardening migrations exist:** Supabase's advisor flagged two things after the first deploy —
+  1. *SECURITY DEFINER RPC exposure.* Postgres/Supabase grant `EXECUTE` on new functions to `PUBLIC` **and** directly to `anon`/`authenticated` by default. This made the trigger functions (`handle_new_user`, `handle_new_recommendation`, `handle_status_change`) and `redeem_invite_code` callable via `/rest/v1/rpc/...` even though only `redeem_invite_code` was meant to be a public entry point. Fixed by explicitly revoking `EXECUTE` from `public`, `anon`, and `authenticated` on the three trigger functions (trigger execution bypasses these checks entirely, so this doesn't affect trigger behavior), and revoking `anon` (only) from `redeem_invite_code`, leaving `authenticated` — its intended caller. `are_friends()` keeps its original `anon, authenticated` grant untouched — that one was a deliberate choice in migration 3 (used for public share-page friend checks), not a default-grant leftover.
+  2. *RLS performance.* All 15 policies called `auth.uid()` unwrapped, which Postgres re-evaluates per row instead of once per query. Re-created every policy with `auth.uid()` wrapped as `(select auth.uid())` — the Supabase-documented fix, logic unchanged. Confirmed via `get_advisors` that all `auth_rls_initplan` warnings are gone post-migration.
+  - Also pinned `search_path = public` on `generate_invite_code()` (the one function missing it, matching the others).
+  - **Not touched, and not a problem:** `unindexed_foreign_keys` and `unused_index` INFO-level advisories — noise from a freshly-seeded, unqueried database, not a real signal at this stage. `auth_leaked_password_protection` (WARN) is an Auth dashboard toggle unrelated to these migrations, not addressed here — low priority since the app uses email OTP, not passwords, for real users (only the seeded test accounts have passwords).
+- **Test logins:** `recs-app/TEST_LOGINS.local.md` (gitignored — emails, passwords, invite codes for the two seeded accounts). Not in the repo; ask Rob directly if you need them for testing.
+- **GitHub:** repo is live at `github.com/robrogan/rex`, this session's changes are pushed to `main`.

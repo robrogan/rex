@@ -36,6 +36,9 @@ yarn-error.*
 !.env.example
 .env*.local
 
+# local-only notes (credentials, personal scratch files)
+*.local.md
+
 # typescript
 *.tsbuildinfo
 
