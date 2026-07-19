@@ -107,6 +107,12 @@ export default function SignIn() {
       ) : (
         <View />
       )}
+
+      {__DEV__ ? (
+        <Link href="/dev/components" style={styles.devLink}>
+          🎨 Components (dev)
+        </Link>
+      ) : null}
     </Screen>
   );
 }
@@ -129,4 +135,5 @@ const styles = StyleSheet.create({
   },
   buttonLabel: { ...type.action, color: colors.primary800 },
   error: { ...type.body, color: colors.primary400 },
+  devLink: { ...type.action, color: colors.description, marginTop: spacing.lg },
 });
