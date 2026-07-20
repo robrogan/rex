@@ -41,10 +41,25 @@ plumbing, but each affects the final feel. Grouped by "quick taste call" vs
    rename, or reorder?
 
 ## C. Blocked on accounts / hardware (you + brief A8)
-- **Push notification delivery.** The code is in place — devices register an Expo push
-  token, and DB triggers fan out on send / status-change — but actually *delivering* a
-  push needs a **development build** plus an **Apple Developer account ($99/yr)** and
-  **Google Play ($25 once)**. The in-app inbox works today without any of that.
+
+> **A8 — YOUR INPUT NEEDED to finish (revisit later).** The build config + push backend
+> are done and verified (see `recs-app/PROGRESS.md` "A8 build config + push loop wired").
+> What remains is entirely account/hardware work only you can do, with exact commands in
+> **`recs-app/BUILD.md`**:
+> 1. Create an **Expo account**; `npm i -g eas-cli` → `eas login`.
+> 2. `eas init` (writes `extra.eas.projectId` into `app.json` — **commit it**).
+> 3. `eas build -p android --profile preview` → send the APK to Leul (no paid account).
+> 4. Enroll in **Apple Developer ($99/yr)**, then `eas build -p ios` → TestFlight for you.
+> 5. Two-device push acceptance test (send a rec → push on the other phone).
+> Bundle id is locked to `com.robrogan.recs`; the display **app name (D1) is still open**
+> but does not block builds.
+
+- **Push notification delivery.** Backend chain is now **live and verified** (Edge Function
+  deployed + `notifications` trigger → Expo, proven end-to-end at the DB level). The only
+  missing piece is a **real device push token**, which appears once a **standalone build**
+  (BUILD.md) is installed and granted notification permission. Needs the **Apple Developer
+  ($99/yr)** + optional **Google Play ($25 once)** accounts. The in-app inbox works today
+  without any of that.
 - **On-device visual QA.** Real fonts + native feel need Expo Go on your phone (seeded
   login in `recs-app/TEST_LOGINS.local.md`). This is the only way to confirm the pixel
   match to Figma.

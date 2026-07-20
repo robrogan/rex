@@ -8,9 +8,9 @@
 | A4 Search/detail | ✅ Done 2026-07-19 | Google Books search (`lib/googleBooks.ts`) + canonical-work dedupe (D5), `lib/items.ts` shared upsert primitive (A5 reuses `ensureItem`), `useBookSearch`/`useDebouncedValue` hooks, S4 search screen (`search.tsx`) + S5 detail (`item/[id].tsx`) with a live **Add-to-my-TBR** (U7, self-recommendation). Zero new deps. tsc + eslint clean; web export bundles all 21 routes. **Live search unverifiable from the build sandbox** (its egress is attributed to a zero-quota GCP project → 429); needs an on-device check by Rob. Canonicalize + RLS/trigger write-path verified offline. See "A4 search & detail built" below. |
 | A5 Friends/send | ✅ Done 2026-07-19 | **Connection half** (`lib/friends.ts` + S7 `friends.tsx` + S11 `friend/[id].tsx`, U3/U4/U14) **and send half** (`lib/send.ts` + S6 `share.tsx` + U15 on book detail, U6/U6b). Invite-code connect via `redeem_invite_code`; multi-select send w/ note + toast; "Copy public link" (placeholder domain). Added `expo-clipboard`. See "A5 friends foundation built" + "Core-loop wave" below. |
 | A6 TBR/status | ✅ Done 2026-07-19 | `lib/tbr.ts` (grouped TBR reads + status mutation) + S3 `(tabs)/tbr.tsx` (category pills, search, BookCard list, per-card status) + S9 `status.tsx` (To read→Started→Finished/Not for me + reaction/note). Status change writes all rec rows for the book; DB trigger fanouts the ping. `lib/embed.ts` fixes PostgREST to-one/to-many embed handling (incl. a latent `friends.ts` bug). |
-| A7 Notifications | 🟡 In-app done 2026-07-19 | `lib/notifications.ts` + S8 `(tabs)/inbox.tsx` (read state, mark-read/all, deep-link) work fully on live data. `usePushRegistration` writes `expo_push_token`, but **push delivery needs a dev build (A8)** — fails soft in Expo Go/web/sim. Added `expo-notifications`. |
+| A7 Notifications | ✅ Backend done 2026-07-20 | In-app inbox (`lib/notifications.ts` + S8) works on live data. **Push delivery chain now live** (A8): `push-fanout` deployed + `notifications`-INSERT trigger → verified end-to-end at the DB level (`sent:true` from Expo). Last mile is a real device token, which requires a standalone build (see A8). |
 | A9 Web share pages | ⬜ | |
-| A8 Builds | ⬜ | |
+| A8 Builds | 🟡 Config + push wired 2026-07-20 | Native build config in `app.json` (`ios.bundleIdentifier`/`android.package` = `com.robrogan.recs`, `expo-notifications` plugin), fleshed-out `eas.json` profiles (dev/preview/prod + submit skeleton), push backend deployed & wired (migration 6). `BUILD.md` runbook written. **Remaining is Rob-only:** `eas login`/`init`/`build`, Apple Developer enrollment, TestFlight/APK install — all documented in `BUILD.md`. |
 
 ---
 
@@ -157,3 +157,57 @@ new single home for input Rob still owes: app name, theme, voice/copy, avatars, 
 query checked against the **live seed** via the Supabase MCP (TBR grouping, recs-between,
 inbox, invite codes, FK-embed shapes). On-device Expo Go pass (fonts, native Share, push)
 remains Rob's, with a seeded login from `TEST_LOGINS.local.md`.
+
+---
+
+## A8 build config + push loop wired — added 2026-07-20
+
+Everything for A8 that doesn't require Rob's accounts/hardware. Branch `a8-builds-push`.
+
+**Native build config (`app.json`).** Added `ios.bundleIdentifier` + `android.package` =
+`com.robrogan.recs` (both required for any EAS build; neutral id decoupled from the still-
+open display name — Rob's call). Added the `expo-notifications` config plugin (notification
+icon = `android-icon-monochrome.png`, color = `#FFA500`) so push renders correctly in a
+standalone build.
+
+**EAS profiles (`eas.json`).** `development` (dev client), **`preview`** = the dogfood
+build (`android.buildType: apk` for Leul, iOS ad-hoc), `production` (autoIncrement) +
+a `submit.production` skeleton (Apple id/team placeholders). EAS Update channels
+intentionally omitted (out of scope for the first build).
+
+**Push delivery — wired live** (project `mipdevkjokgaamnulqvr`), closing the two gaps that
+kept A7 amber:
+- Deployed the `push-fanout` Edge Function (`verify_jwt` on) via the Supabase MCP — was
+  written in A3 but never deployed.
+- Migration `20260720000006_notifications_push_webhook`: enables `pg_net`, adds
+  `handle_notification_push()` (`security definer`, pinned `search_path`, `execute` revoked
+  from public/anon/authenticated — matches the migration 4/5 hardening) and an
+  `after insert` trigger on `public.notifications` that `net.http_post`s the row to the
+  function. Auth uses the anon key (a valid JWT, not secret — already in the client).
+- **Verified end-to-end at the DB level:** set a dummy Expo token on the seeded Rob row,
+  inserted a `rec_received` notification → `net._http_response` showed the function
+  returned `{"sent":true,"expoStatus":200}` (trigger → pg_net → Edge Function → exp.host
+  all fired). Test data then removed; seed back to baseline (2 notifications, 0 tokens).
+
+**Advisor note.** The migration first landed pg_net in `public`, tripping a new
+`extension_in_public` WARN; migration `20260720000007_move_pg_net_to_extensions` relocated
+it (drop + recreate — pg_net is not relocatable) to the `extensions` schema, and
+`get_advisors(security)` is now clean of that warning. pg_net's API functions stay in the
+`net` schema, so `handle_notification_push` still resolves `net.http_post` (re-verified
+`sent:true` after the move). The remaining WARNs (`are_friends`, `redeem_invite_code`,
+leaked-password) are all pre-existing and previously accepted (see the "Supabase backend
+connected & hardened" section). `handle_notification_push` did **not** trip a SECURITY
+DEFINER warning — the revoke worked.
+
+**Docs.** New `BUILD.md` = the full runbook for the Rob-only remainder (`eas login`/`init`,
+Android APK now, iOS TestFlight in parallel behind Apple Developer enrollment, push
+acceptance test). `INSTALL.md` gained a "Standalone build" pointer.
+
+**Verified (build side):** `expo config --type public` resolves with the new bundle id /
+package and the `expo-notifications` plugin; `tsc --noEmit` clean; `eslint .` clean (same
+lone generated-`router.d.ts` warning); `expo export --platform web` bundles all routes.
+
+**Remaining (Rob, in `BUILD.md`):** Expo + Apple Developer ($99/yr) + optional Google Play
+($25) accounts; `eas login` → `eas init` (writes `extra.eas.projectId` back into
+`app.json` — commit it) → `eas build`; then the two-device push acceptance test. No code
+change needed once the projectId exists (`lib/notifications.ts` already reads it).
