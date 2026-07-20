@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.robrogan.recs"
+      "bundleIdentifier": "com.robrogan.recs",
+      "associatedDomains": ["applinks:PLACEHOLDER_DOMAIN"]
     },
     "android": {
       "package": "com.robrogan.recs",
@@ -19,7 +20,15 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "autoVerify": true,
+          "action": "VIEW",
+          "data": { "scheme": "https", "host": "PLACEHOLDER_DOMAIN", "pathPrefix": "/item" },
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static",

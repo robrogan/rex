@@ -9,7 +9,7 @@
 | A5 Friends/send | ✅ Done 2026-07-19 | **Connection half** (`lib/friends.ts` + S7 `friends.tsx` + S11 `friend/[id].tsx`, U3/U4/U14) **and send half** (`lib/send.ts` + S6 `share.tsx` + U15 on book detail, U6/U6b). Invite-code connect via `redeem_invite_code`; multi-select send w/ note + toast; "Copy public link" (placeholder domain). Added `expo-clipboard`. See "A5 friends foundation built" + "Core-loop wave" below. |
 | A6 TBR/status | ✅ Done 2026-07-19 | `lib/tbr.ts` (grouped TBR reads + status mutation) + S3 `(tabs)/tbr.tsx` (category pills, search, BookCard list, per-card status) + S9 `status.tsx` (To read→Started→Finished/Not for me + reaction/note). Status change writes all rec rows for the book; DB trigger fanouts the ping. `lib/embed.ts` fixes PostgREST to-one/to-many embed handling (incl. a latent `friends.ts` bug). |
 | A7 Notifications | ✅ Backend done 2026-07-20 | In-app inbox (`lib/notifications.ts` + S8) works on live data. **Push delivery chain now live** (A8): `push-fanout` deployed + `notifications`-INSERT trigger → verified end-to-end at the DB level (`sent:true` from Expo). Last mile is a real device token, which requires a standalone build (see A8). |
-| A9 Web share pages | ⬜ | |
+| A9 Web share pages | 🟡 Core built 2026-07-20 | Public `/item/{id}` now viewable signed-out (AuthGate passthrough); detail screen is session-aware (static content + sign-up CTA for anon, dynamic U15 hidden); deep-link config in `app.json` (iOS `associatedDomains` + Android `intentFilters`, placeholder host); `.well-known/` templates (AASA + assetlinks) copied into the web export. **Remaining is Rob-only:** real domain (D1), Apple Team ID + Android cert fingerprint in the two `.well-known` files, host the export. See "A9 public share pages (core)" below + `BUILD.md`. |
 | A8 Builds | 🟡 Config + push wired 2026-07-20 | Native build config in `app.json` (`ios.bundleIdentifier`/`android.package` = `com.robrogan.recs`, `expo-notifications` plugin), fleshed-out `eas.json` profiles (dev/preview/prod + submit skeleton), push backend deployed & wired (migration 6). `BUILD.md` runbook written. **Remaining is Rob-only:** `eas login`/`init`/`build`, Apple Developer enrollment, TestFlight/APK install — all documented in `BUILD.md`. |
 
 ---
@@ -211,3 +211,41 @@ lone generated-`router.d.ts` warning); `expo export --platform web` bundles all 
 ($25) accounts; `eas login` → `eas init` (writes `extra.eas.projectId` back into
 `app.json` — commit it) → `eas build`; then the two-device push acceptance test. No code
 change needed once the projectId exists (`lib/notifications.ts` already reads it).
+
+---
+
+## A9 public share pages (core) — added 2026-07-20
+
+The last unbuilt agent brief. Everything buildable without the real domain or Apple/Google
+credentials; the tail is documented as Rob-only (same shape as A8). Branch `a9-web-share`.
+Zero new deps, **no new migration** — anon read on `items` already exists (A3 hardening:
+`grant select on public.items to anon` + `items_select_all using (true)`).
+
+- **AuthGate passthrough (`src/app/_layout.tsx`).** Added `item/*` to the signed-out
+  whitelist (alongside `(auth)` and `dev`), so a browser hitting `/item/{id}` renders instead
+  of bouncing to `/sign-in`. Signed-in redirects are unchanged.
+- **Session-aware detail (`src/app/item/[id].tsx`).** Reads `useAuth().session`. Static
+  content (cover, title, authors, tags, description) shows for everyone. For a signed-out
+  viewer the TBR/send/status actions are replaced by a single **sign-up CTA**
+  (`→ /onboarding`), and the dynamic U15 "Recommended to…" query is skipped entirely (also
+  RLS-empty for anon). Signed-in behavior is untouched.
+- **Deep-link config (`app.json`).** `ios.associatedDomains: ["applinks:PLACEHOLDER_DOMAIN"]`
+  and an Android `intentFilters` autoVerify VIEW filter (`https` / `PLACEHOLDER_DOMAIN` /
+  `pathPrefix:/item`). Host is a **placeholder** decoupled from the still-open display name;
+  Expo Router already maps `/item/{id}` to `item/[id].tsx` on web + native.
+- **`.well-known/` templates (`public/.well-known/`).** `apple-app-site-association` (AASA,
+  `appIDs: ["PLACEHOLDER_TEAMID.com.robrogan.recs"]`, `/item/*` component) + `assetlinks.json`
+  (`com.robrogan.recs`, placeholder SHA-256) + a `README.md` documenting exactly what Rob
+  fills. Expo copies `public/` verbatim into the web export, so these serve from the site root
+  once hosted.
+
+**Verified:** `tsc --noEmit` clean; `eslint` clean on the changed files; `expo config --type
+public` resolves the new `associatedDomains` / `intentFilters`; `expo export --platform web`
+bundles all routes (incl. `/item/[id]`) **and** copies `.well-known/{apple-app-site-association,
+assetlinks.json}` into `dist/`. On-device / hosted universal-link acceptance is Rob's (needs
+the domain + credentials).
+
+**Remaining (Rob, in `BUILD.md` → "A9"):** pick the public domain (ties to D1) → set
+`EXPO_PUBLIC_PUBLIC_BASE_URL` + the two `app.json` placeholder hosts; fill AASA with the Apple
+**Team ID** and `assetlinks.json` with the Android **SHA-256 cert fingerprint** (`eas
+credentials`); host the `expo export` web output at the domain.

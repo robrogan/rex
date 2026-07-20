@@ -21,7 +21,12 @@ plumbing, but each affects the final feel. Grouped by "quick taste call" vs
 ## B. New taste calls surfaced while building the foundation
 1. **Public share domain.** `lib/config.ts` `PUBLIC_BASE_URL` is `https://example.com`
    (placeholder). The "Copy public link" button and the A9 web pages need the real
-   domain — tied to D1. Set `EXPO_PUBLIC_PUBLIC_BASE_URL` once it exists.
+   domain — tied to D1. Set `EXPO_PUBLIC_PUBLIC_BASE_URL` once it exists. **Now also gates
+   the A9 deep-link verification** (the A9 core is built): the domain must be filled into
+   `app.json` (`ios.associatedDomains` / `android.intentFilters`, currently `PLACEHOLDER_DOMAIN`)
+   and the app export hosted there, and the two `public/.well-known/` files need the Apple
+   **Team ID** + Android **SHA-256 cert fingerprint**. Full checklist in `recs-app/BUILD.md`
+   → "A9".
 2. **Status when >1 friend recommends the same book.** The TBR shows **one card per
    book** ("Nick +1"); changing its status writes **all** the underlying recommendation
    rows so the card stays coherent. Confirm that's what you want (vs. a separate status

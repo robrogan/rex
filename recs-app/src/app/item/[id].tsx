@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
-import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton, RecBadge, TagChip } from '../../components';
+import { useAuth } from '../../lib/auth';
 import { fetchVolume, type BookVolume } from '../../lib/googleBooks';
 import { addToTbr } from '../../lib/items';
 import { useRecommendedTo } from '../../lib/send';
@@ -30,12 +31,18 @@ function rowToVolume(row: ItemRow): BookVolume {
  * S5 — Book detail. Resolves two id forms (A4 plan):
  *   `gb:<volumeId>` → fresh Google Books result (not yet in the DB)
  *   `<uuid>`        → a DB-backed `items` row (TBR items, shared links)
- * Also the public web route (S12); dynamic content gets gated in A9.
+ * Also the public web route (S12, A9): a signed-out visitor sees static content
+ * (cover, title, author, tags, description) and a sign-up CTA in place of the
+ * TBR/send/status actions; all dynamic/social content (U15 "Recommended to…") is
+ * hidden. Signed-in users get the full in-app affordances.
  * The U15 "Recommended to…" affordance is added in A5.
  */
 export default function ItemDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isGb = id?.startsWith('gb:') ?? false;
+  const { session } = useAuth();
+  const isPublic = !session; // signed-out web viewer (A9)
+  const router = useRouter();
 
   const { data: book, isLoading, isError } = useQuery({
     queryKey: ['itemDetail', id],
@@ -54,8 +61,9 @@ export default function ItemDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tbr'] }),
   });
 
-  // U15 "Recommended to…" — only DB-backed items can have recs (skip fresh gb: results).
-  const { data: recommendedTo } = useRecommendedTo(isGb ? undefined : id);
+  // U15 "Recommended to…" — dynamic/social, so only for signed-in viewers, and only
+  // for DB-backed items (skip fresh gb: results and public web visitors).
+  const { data: recommendedTo } = useRecommendedTo(isGb || isPublic ? undefined : id);
 
   if (isLoading) {
     return (
@@ -112,23 +120,34 @@ export default function ItemDetail() {
 
         {book.description ? <Text style={type.description}>{book.description}</Text> : null}
 
-        {/* Actions (A5/A6 will extend). Add-to-TBR is live; Share/status are stubs. */}
-        <View style={styles.actions}>
-          <PrimaryButton
-            label={tbrLabel}
-            onPress={() => addTbr.mutate()}
-            disabled={addTbr.isPending || addTbr.isSuccess}
-          />
-          {addTbr.isError ? (
-            <Text style={type.body}>Couldn’t add — try again.</Text>
-          ) : null}
-          <Link href={{ pathname: '/share', params: { item: id } }} style={type.action}>
-            → Send to a friend (S6)
-          </Link>
-          <Link href="/status" style={type.action}>
-            → Update status (S9)
-          </Link>
-        </View>
+        {isPublic ? (
+          /* A9 public share page — no session: sign-up CTA replaces the app actions. */
+          <View style={styles.actions}>
+            <Text style={type.body}>Someone recommended this book.</Text>
+            <PrimaryButton
+              label="Get the app to save it"
+              onPress={() => router.push('/onboarding')}
+            />
+          </View>
+        ) : (
+          /* Signed-in actions. Add-to-TBR is live; Share/status open their sheets. */
+          <View style={styles.actions}>
+            <PrimaryButton
+              label={tbrLabel}
+              onPress={() => addTbr.mutate()}
+              disabled={addTbr.isPending || addTbr.isSuccess}
+            />
+            {addTbr.isError ? (
+              <Text style={type.body}>Couldn’t add — try again.</Text>
+            ) : null}
+            <Link href={{ pathname: '/share', params: { item: id } }} style={type.action}>
+              → Send to a friend (S6)
+            </Link>
+            <Link href="/status" style={type.action}>
+              → Update status (S9)
+            </Link>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

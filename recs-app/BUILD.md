@@ -123,3 +123,37 @@ Seeded logins for testing are in `TEST_LOGINS.local.md` (gitignored).
   an older Expo Go.
 - **Bundle id already in use:** if `com.robrogan.recs` collides on the App Store, pick
   another reverse-DNS id and update `app.json` **before** the first iOS build.
+
+---
+
+## A9 — public share pages & deep links (finish)
+
+The A9 **core is built** (see `PROGRESS.md` → "A9 public share pages (core)"): the public
+`/item/{id}` page renders static book content to signed-out visitors with a sign-up CTA, the
+deep-link config is in `app.json`, and the `.well-known/` verification templates are copied
+into the web export. What remains needs the real domain + your build credentials.
+
+**Prereq:** pick the public domain (ties to the app name **D1**; see
+`docs/DECISIONS_NEEDED.md` §B1). Everything below uses `<domain>` for it.
+
+1. **Set the domain everywhere it's placeholdered:**
+   - `EXPO_PUBLIC_PUBLIC_BASE_URL=https://<domain>` in `.env` (drives the "Copy public link"
+     button via `lib/config.ts`).
+   - `app.json` → `ios.associatedDomains`: `"applinks:<domain>"` (replace `PLACEHOLDER_DOMAIN`).
+   - `app.json` → `android.intentFilters[0].data.host`: `<domain>` (replace `PLACEHOLDER_DOMAIN`).
+2. **Fill the `.well-known/` files** (`public/.well-known/`, see their `README.md`):
+   - `apple-app-site-association`: replace `PLACEHOLDER_TEAMID` with your **Apple Developer
+     Team ID** → `"<TEAMID>.com.robrogan.recs"`.
+   - `assetlinks.json`: replace `PLACEHOLDER_SHA256_CERT_FINGERPRINT` with the Android signing
+     cert **SHA-256** from `eas credentials` (Android keystore).
+3. **Rebuild** so the native builds pick up the association config (`eas build` again — the
+   verification files are read by the OS from the hosted domain, but the app-side domain must
+   match). A `.well-known` change alone only needs a re-host, not a rebuild; an `app.json`
+   host/Team-ID change needs a rebuild.
+4. **Host the web export at `<domain>`:** `npx expo export --platform web` → deploy `dist/`
+   to any static host (must serve `/.well-known/apple-app-site-association` and
+   `/.well-known/assetlinks.json` as JSON over HTTPS **with no redirect**, and route
+   `/item/*` to the exported `item/[id].html`).
+5. **Acceptance (from the A9 brief):** open a `https://<domain>/item/<uuid>` link in an
+   **incognito browser** → static book content + sign-up prompt, no login wall. Open the same
+   URL on a phone **with the app installed** → it deep-links to the in-app detail screen.

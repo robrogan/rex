@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["PLACEHOLDER_TEAMID.com.robrogan.recs"],
+        "components": [
+          {
+            "/": "/item/*",
+            "comment": "Public book share pages open the app when installed."
+          }
+        ]
+      }
+    ]
+  }
+}

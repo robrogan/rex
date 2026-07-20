@@ -24,7 +24,8 @@ function AuthGate() {
     if (!configured || loading) return;
     const inAuthGroup = segments[0] === '(auth)';
     const inDevGroup = segments[0] === 'dev'; // hidden gallery — reachable without auth
-    if (!session && !inAuthGroup && !inDevGroup) router.replace('/sign-in');
+    const inItemRoute = segments[0] === 'item'; // public share page (A9) — viewable signed-out
+    if (!session && !inAuthGroup && !inDevGroup && !inItemRoute) router.replace('/sign-in');
     else if (session && inAuthGroup) router.replace('/tbr');
   }, [configured, loading, session, segments, router]);
 
