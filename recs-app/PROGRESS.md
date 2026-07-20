@@ -22,6 +22,7 @@ Figma **screen drafts** (DEFERRED_TASKS #3, not A2) are done. This is the visual
 - **Local `mvp/*` component kit** (parked off-canvas on that page) maps ~1:1 to A2 code components: `mvp/Pill` (variant State=Default/Active) → `TabPill`; `mvp/Button` → `PrimaryButton`; `mvp/Avatar` → `Avatar`; `mvp/Input` → `SearchBar`/fields; `mvp/Book Thumb` → cover placeholder in `BookCard`.
 - **`BookCard`, `TagChip`, `RecBadge`** were NOT drafted as standalone Figma components — they already exist on the **original** pages (Home → "Initial" TBR list, and Book Detail). Match those for the "3+ Friendos"/stacked-avatar "+N" treatment.
 - **Tokens** confirmed against `theme.ts`: bg `#4B0082`, font `#EE82EE`, fontOnPrimary `#F6F5F5`, primary400 `#FFA500`, primary800 `#241C47`, description `#F5C4DE` (now also a Figma color variable + a `description` Goudy text style).
+- **S10/S11/S12 first-draft mockups added 2026-07-20** to the same MVP Drafts page (right of the originals, x=3132/3654/4176; frame ids S10 `54694:595`, S11 `54694:597`, S12 `54694:599`). These were the three code-only screens with no prior design — rough first passes built from the `mvp/*` kit + Rainbow-bound variables as a **starting point for Rob to redesign**, not finished visuals. Figma now covers all 12 screens (S1–S12).
 
 **A2 flags to reconcile with Figma when coding:**
 - **Active pill/button labels use DARK text** (`primary800`) on the orange fill — matches the existing "Books" tab — not white/`fontOnPrimary`.

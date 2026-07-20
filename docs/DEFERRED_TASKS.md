@@ -4,7 +4,7 @@ Context: 2026-07-18 session was Fable-only (other models capped at 93% utilizati
 
 1. **Parallel build fan-out (A1–A8, A9)** — once limits reset, the briefs in `AGENT_BRIEFS.md` can be dispatched to separate agents in dependency order (A1 → A2 → A3∥A4 → A5 → A6 → A7 → A9 → A8) instead of built serially.
 2. **Independent verification pass** — a separate agent should review the plan pack + any code produced this session with fresh eyes (spec/architecture consistency, RLS policy audit).
-3. ~~**Figma screen drafts (S2, S4, S6–S9)**~~ — ✅ Done 2026-07-19. Drafted on the new **MVP Drafts** page (S2, S4, S6, S7, S8, S9) with a local `mvp/*` component kit + a `description` color variable & Goudy text style; existing pages untouched. Now the visual reference for A2/A4/A5/A6 — see `recs-app/PROGRESS.md` → "Design reference (Figma)".
+3. ~~**Figma screen drafts (S2, S4, S6–S9)**~~ — ✅ Done 2026-07-19. Drafted on the new **MVP Drafts** page (S2, S4, S6, S7, S8, S9) with a local `mvp/*` component kit + a `description` color variable & Goudy text style; existing pages untouched. Now the visual reference for A2/A4/A5/A6 — see `recs-app/PROGRESS.md` → "Design reference (Figma)". **Extended 2026-07-20:** S10/S11/S12 first-draft mockups added to the same page (the three code-only screens); Figma now covers all 12 screens. These three are rough starting points for Rob to redesign.
 4. **Bulk asset work** — exporting/optimizing the flying-books illustration, app icon variants, splash screens.
 
 Figma kickoff prompt (for Claude Code once write access works):
