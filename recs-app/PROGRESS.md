@@ -6,9 +6,9 @@
 | A2 Design system | ✅ Done 2026-07-19 | 8 components in `src/components/` (`Avatar`, `TabPill`, `PrimaryButton`/`SecondaryButton`, `SearchBar`, `TagChip`, `RecBadge`, `BookCard`) + barrel `index.ts`, matched to the Figma MVP Drafts `mvp/*` kit and the original Home/Detail card. Hidden `/dev/components` gallery renders every state. Theme reconciled (violet card outline, `description` 16/24, kit-accurate `radii`/`type` tokens). tsc + eslint clean; `expo export --platform web` bundles `/dev/components`. See "A2 design system built" below. |
 | A3 Backend | ✅ Done 2026-07-19 | SQL migrations (schema/RLS/triggers/hardening), seed (2 users + 5 books), `push-fanout` Edge Function stub, `config.toml`; client wiring `lib/supabase.ts` + `lib/auth.tsx` (email OTP) + React Query + typed `types/database.ts`; functional OTP sign-in. **Live Supabase project connected** (ref `mipdevkjokgaamnulqvr`), migrations 1-5 + seed applied directly via the Supabase MCP and verified (row counts match seed exactly, triggers fire). Test logins in `recs-app/TEST_LOGINS.local.md` (gitignored, not in repo — ask Rob if you need them). See "Supabase backend connected & hardened" below. |
 | A4 Search/detail | ✅ Done 2026-07-19 | Google Books search (`lib/googleBooks.ts`) + canonical-work dedupe (D5), `lib/items.ts` shared upsert primitive (A5 reuses `ensureItem`), `useBookSearch`/`useDebouncedValue` hooks, S4 search screen (`search.tsx`) + S5 detail (`item/[id].tsx`) with a live **Add-to-my-TBR** (U7, self-recommendation). Zero new deps. tsc + eslint clean; web export bundles all 21 routes. **Live search unverifiable from the build sandbox** (its egress is attributed to a zero-quota GCP project → 429); needs an on-device check by Rob. Canonicalize + RLS/trigger write-path verified offline. See "A4 search & detail built" below. |
-| A5 Friends/send | 🟡 Partial 2026-07-19 | **Friends-connection half done** (built parallel to A4, no file overlap): `lib/friends.ts` data layer + S7 `(tabs)/friends.tsx` (invite code share/copy, connect-by-code via `redeem_invite_code`, friends list) + S11 `friend/[id].tsx` (recs-between-us, U14). Added `expo-clipboard`. tsc + eslint clean; web export bundles `/friends` + `/friend/[id]`; queries verified against live seed (Rob↔Leul). **Deferred to post-A4:** S6 send-a-rec share sheet + U15 "Recommended to…" (both hang off A4's book detail). See "A5 friends foundation built" below. |
-| A6 TBR/status | ⬜ | |
-| A7 Notifications | ⬜ | |
+| A5 Friends/send | ✅ Done 2026-07-19 | **Connection half** (`lib/friends.ts` + S7 `friends.tsx` + S11 `friend/[id].tsx`, U3/U4/U14) **and send half** (`lib/send.ts` + S6 `share.tsx` + U15 on book detail, U6/U6b). Invite-code connect via `redeem_invite_code`; multi-select send w/ note + toast; "Copy public link" (placeholder domain). Added `expo-clipboard`. See "A5 friends foundation built" + "Core-loop wave" below. |
+| A6 TBR/status | ✅ Done 2026-07-19 | `lib/tbr.ts` (grouped TBR reads + status mutation) + S3 `(tabs)/tbr.tsx` (category pills, search, BookCard list, per-card status) + S9 `status.tsx` (To read→Started→Finished/Not for me + reaction/note). Status change writes all rec rows for the book; DB trigger fanouts the ping. `lib/embed.ts` fixes PostgREST to-one/to-many embed handling (incl. a latent `friends.ts` bug). |
+| A7 Notifications | 🟡 In-app done 2026-07-19 | `lib/notifications.ts` + S8 `(tabs)/inbox.tsx` (read state, mark-read/all, deep-link) work fully on live data. `usePushRegistration` writes `expo_push_token`, but **push delivery needs a dev build (A8)** — fails soft in Expo Go/web/sim. Added `expo-notifications`. |
 | A9 Web share pages | ⬜ | |
 | A8 Builds | ⬜ | |
 
@@ -120,3 +120,40 @@ Search → book detail → add-to-TBR, the first slice of the core loop. Branch 
 - Add-to-TBR write path verified by RLS policy + trigger (no live-DB mutation): `recs_insert_valid` explicitly permits `(sender_id is null and recipient_id = auth.uid())`; `items_insert/update_auth` permit the upsert; `handle_new_recommendation` auto-creates `rec_status('to_read')` and skips notification for a null sender; `recommendations_selfadd_unique` gives idempotency.
 
 **⚠️ Not verified — needs Rob on-device:** live Google Books search. The build sandbox's network egress is attributed to a Google Cloud project with a per-day Books quota of **0**, so every call 429s here regardless of code. On a real phone / residential network the keyless endpoint works within the normal unauthenticated limit. Acceptance check for Rob (Expo Go, seeded login): search **"oathbringer"** → one entry (not many editions) with covers → tap → detail renders → **Add to my TBR** flips to "On your TBR ✓"; confirm a `recommendations` row (`sender_id NULL`) + `rec_status('to_read')` appear. If quota bites in real use, drop a key into `EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY`.
+
+---
+
+## Core-loop wave (A5-send, A6, A7, S10) — added 2026-07-19
+
+Built on `main` after A4 landed, completing the send → receive → status → ping loop.
+Theme-token-only, reuses A2 components, disjoint files from A4. New deps:
+`expo-clipboard`, `expo-notifications` (both SDK-57 pinned, Expo Go compatible).
+
+- **A6 TBR + status.** `lib/tbr.ts` groups a user's `recommendations` (recipient = me)
+  into one card per book with combined recommenders; `useSetStatus` writes every rec row
+  for the book. S3 `(tabs)/tbr.tsx` (pills, search link, cards, per-card status entry);
+  S9 `status.tsx` sheet (reaction + note on Finished). `lib/embed.ts` normalizes
+  PostgREST to-one vs to-many embeds — also fixed a latent `friends.ts` bug where
+  `rec_status` was read as an array (`[0]`) but comes back as an object, so status could
+  silently be null.
+- **A5 send (S6).** `lib/send.ts` (`useSendRecommendations`, 23505 → "already sent";
+  `useRecommendedTo` for U15). `share.tsx` resolves the route id → item uuid (ensuring
+  fresh `gb:` books via A4's `ensureItem`), multi-selects friends, sends w/ note + toast,
+  and copies a public link. Book detail (A4's screen) now passes the item param to
+  `/share` and renders the U15 "Recommended to…" badge.
+- **A7 inbox (S8).** `lib/notifications.ts` + `(tabs)/inbox.tsx`: live in-app inbox with
+  read state, mark-read/all, and deep-links. `usePushRegistration` (mounted in
+  `(tabs)/_layout.tsx`) registers the Expo token but **push delivery is gated on A8**
+  (dev build + store accounts); it fails soft everywhere else.
+- **S10 profile.** `(tabs)/profile.tsx`: edit display name + avatar (`useUpdateProfile`),
+  show/copy invite code, sign out.
+
+**Shared status/reaction copy** lives in `lib/status.ts`; the public share domain in
+`lib/config.ts` — both are placeholders pending Rob (see `docs/DECISIONS_NEEDED.md`, the
+new single home for input Rob still owes: app name, theme, voice/copy, avatars, domain).
+
+**Verified:** `tsc --noEmit` clean; `eslint .` clean (0 errors; lone warning is generated
+`.expo/types/router.d.ts`); `expo export --platform web` bundles all 21 routes. Every new
+query checked against the **live seed** via the Supabase MCP (TBR grouping, recs-between,
+inbox, invite codes, FK-embed shapes). On-device Expo Go pass (fonts, native Share, push)
+remains Rob's, with a seeded login from `TEST_LOGINS.local.md`.

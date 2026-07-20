@@ -114,6 +114,22 @@ export function useRedeemInviteCode() {
   });
 }
 
+/** Update my own profile (S10) — display name and/or avatar. */
+export function useUpdateProfile() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: { display_name?: string; avatar?: string | null }) => {
+      const { error } = await supabase.from('users').update(patch).eq('id', user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['myProfile'] });
+      void queryClient.invalidateQueries({ queryKey: ['friends'] });
+    },
+  });
+}
+
 // Raw shape of the nested select below (typed via `.returns<>()` so we avoid casts).
 interface RawRecRow {
   id: string;
