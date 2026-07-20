@@ -1,7 +1,10 @@
 import { Tabs } from 'expo-router';
+import { usePushRegistration } from '../../lib/notifications';
 import { colors, fonts } from '../../lib/theme';
 
 export default function TabsLayout() {
+  // Register this device's Expo push token once the user is in the app (A7).
+  usePushRegistration();
   return (
     <Tabs
       screenOptions={{
