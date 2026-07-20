@@ -5,7 +5,7 @@
 | A1 Scaffold | ✅ Done 2026-07-18 | Expo SDK 57, expo-router, TS strict, theme tokens from Figma, S1–S12 placeholder routes, eas.json (dev/preview/prod), ESLint+Prettier. Verified: tsc clean, eslint clean, `expo export --platform web` bundles all routes. App name/slug placeholder "Recs App (working title)" pending D1. |
 | A2 Design system | ✅ Done 2026-07-19 | 8 components in `src/components/` (`Avatar`, `TabPill`, `PrimaryButton`/`SecondaryButton`, `SearchBar`, `TagChip`, `RecBadge`, `BookCard`) + barrel `index.ts`, matched to the Figma MVP Drafts `mvp/*` kit and the original Home/Detail card. Hidden `/dev/components` gallery renders every state. Theme reconciled (violet card outline, `description` 16/24, kit-accurate `radii`/`type` tokens). tsc + eslint clean; `expo export --platform web` bundles `/dev/components`. See "A2 design system built" below. |
 | A3 Backend | ✅ Done 2026-07-19 | SQL migrations (schema/RLS/triggers/hardening), seed (2 users + 5 books), `push-fanout` Edge Function stub, `config.toml`; client wiring `lib/supabase.ts` + `lib/auth.tsx` (email OTP) + React Query + typed `types/database.ts`; functional OTP sign-in. **Live Supabase project connected** (ref `mipdevkjokgaamnulqvr`), migrations 1-5 + seed applied directly via the Supabase MCP and verified (row counts match seed exactly, triggers fire). Test logins in `recs-app/TEST_LOGINS.local.md` (gitignored, not in repo — ask Rob if you need them). See "Supabase backend connected & hardened" below. |
-| A4 Search/detail | ⬜ | |
+| A4 Search/detail | ✅ Done 2026-07-19 | Google Books search (`lib/googleBooks.ts`) + canonical-work dedupe (D5), `lib/items.ts` shared upsert primitive (A5 reuses `ensureItem`), `useBookSearch`/`useDebouncedValue` hooks, S4 search screen (`search.tsx`) + S5 detail (`item/[id].tsx`) with a live **Add-to-my-TBR** (U7, self-recommendation). Zero new deps. tsc + eslint clean; web export bundles all 21 routes. **Live search unverifiable from the build sandbox** (its egress is attributed to a zero-quota GCP project → 429); needs an on-device check by Rob. Canonicalize + RLS/trigger write-path verified offline. See "A4 search & detail built" below. |
 | A5 Friends/send | 🟡 Partial 2026-07-19 | **Friends-connection half done** (built parallel to A4, no file overlap): `lib/friends.ts` data layer + S7 `(tabs)/friends.tsx` (invite code share/copy, connect-by-code via `redeem_invite_code`, friends list) + S11 `friend/[id].tsx` (recs-between-us, U14). Added `expo-clipboard`. tsc + eslint clean; web export bundles `/friends` + `/friend/[id]`; queries verified against live seed (Rob↔Leul). **Deferred to post-A4:** S6 send-a-rec share sheet + U15 "Recommended to…" (both hang off A4's book detail). See "A5 friends foundation built" below. |
 | A6 TBR/status | ⬜ | |
 | A7 Notifications | ⬜ | |
@@ -96,3 +96,27 @@ The **connection half of brief A5** (U3/U4/U14), built on branch `a5-friends` **
 **Deferred to post-A4** (both hang off A4's book-detail screen): S6 send-a-rec share sheet + success toast, and the U15 "Recommended to…" affordance.
 
 **Verified:** `tsc --noEmit` clean; `eslint .` clean (lone warning is in generated `.expo/types/router.d.ts`, gitignored); `expo export --platform web` bundles `/friends` + `/friend/[id]`. Query correctness confirmed against the **live** seed via the Supabase MCP: invite codes `ROB123`/`LEUL42`; `useRecsBetween(Rob↔Leul)` = You sent → *Butter*, they sent → *Oathbringer* (both `to_read`); the null-sender self-add is correctly excluded from the pair view. On-device Expo Go check (fonts, native Share sheet) is Rob's to run with a seeded login from `TEST_LOGINS.local.md`.
+
+---
+
+## A4 search & detail built — added 2026-07-19
+
+Search → book detail → add-to-TBR, the first slice of the core loop. Branch `a4-search-detail` off `main`. Decisions this session: **canonical work only** (D5 — no edition picker), **lazy DB writes** (a book is written to `items` only on action, never on view), and **"Add to my TBR" (U7) included** so the screen is a working standalone loop.
+
+**New files**
+- `src/lib/googleBooks.ts` — `searchVolumes` / `fetchVolume` (endpoint `/books/v1/volumes`, `country=US` required, optional `EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY`), normalize (https-ify covers, strip page-curl, cap categories to 3 tags), and `canonicalize()` — groups by normalized *title|firstAuthor*, keeps the most complete volume per group, preserves first-seen order. Pure, no React.
+- `src/lib/items.ts` — the **A5-shared** DB primitive: `volumeToItemInsert`, `ensureItem` (upsert on `items(source, source_id)`), `addToTbr` (self-recommendation, `sender_id = null`; swallows `23505` for idempotency). Standalone so the parallel A5 branch reconciles cleanly.
+- `src/hooks/useDebouncedValue.ts` (350ms) + `src/hooks/useBookSearch.ts` (`useInfiniteQuery`, min 2 chars, canonicalized across pages).
+
+**Screens**
+- `src/app/search.tsx` (S4) — `SearchBar` + `FlatList` of `BookCard`-in-`Pressable`; idle / loading / empty / error-retry states; infinite scroll. Taps navigate to `/item/gb:<volumeId>`.
+- `src/app/item/[id].tsx` (S5) — dual-form loader: `gb:<volumeId>` → Google Books API; a bare uuid → `items` row (so A6 TBR items and A9 share links resolve in the same screen). Real layout (cover, title, author, `TagChip`s, description) + a live **Add-to-my-TBR** `PrimaryButton` (`useMutation` → `addToTbr`, invalidates `['tbr']`). **Left untouched for A5/A6:** the Share/status stub `<Link>`s and a marked U15 stub — so A5's send sheet + "Recommended to…" layer on with minimal conflict.
+
+**No `package.json` change** (Google Books is plain `fetch`; React Query + expo-image already present) — one fewer collision point with A5.
+
+**Verified**
+- `tsc --noEmit` clean; `eslint .` clean (same generated-`router.d.ts` warning); `expo export --platform web` bundles all 21 routes incl. `/search` + `/item/[id]`.
+- `canonicalize()` exercised offline on 8 synthetic Oathbringer editions → collapses to 1 canonical work (most-complete winner), order preserved, distinct title/author variants correctly kept separate. **Known trade-off:** a subtitle variant (e.g. *"Oathbringer (Book Three…)"*) forms its own group — acceptable for the MVP's deliberately-simple D5 approach.
+- Add-to-TBR write path verified by RLS policy + trigger (no live-DB mutation): `recs_insert_valid` explicitly permits `(sender_id is null and recipient_id = auth.uid())`; `items_insert/update_auth` permit the upsert; `handle_new_recommendation` auto-creates `rec_status('to_read')` and skips notification for a null sender; `recommendations_selfadd_unique` gives idempotency.
+
+**⚠️ Not verified — needs Rob on-device:** live Google Books search. The build sandbox's network egress is attributed to a Google Cloud project with a per-day Books quota of **0**, so every call 429s here regardless of code. On a real phone / residential network the keyless endpoint works within the normal unauthenticated limit. Acceptance check for Rob (Expo Go, seeded login): search **"oathbringer"** → one entry (not many editions) with covers → tap → detail renders → **Add to my TBR** flips to "On your TBR ✓"; confirm a `recommendations` row (`sender_id NULL`) + `rec_status('to_read')` appear. If quota bites in real use, drop a key into `EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY`.
