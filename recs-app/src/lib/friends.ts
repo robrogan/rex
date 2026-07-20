@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { Reaction, RecStatusValue } from '../types/database';
 import { useAuth } from './auth';
+import { embedOne } from './embed';
 import { supabase } from './supabase';
 
 export interface MyProfile {
@@ -121,11 +122,16 @@ interface RawRecRow {
   note: string | null;
   created_at: string;
   items: { title: string; authors: string[]; cover_url: string | null } | null;
-  rec_status: { status: RecStatusValue; reaction: Reaction | null }[];
+  rec_status: RecStatusEmbed | RecStatusEmbed[] | null;
+}
+
+interface RecStatusEmbed {
+  status: RecStatusValue;
+  reaction: Reaction | null;
 }
 
 function toRecBetween(row: RawRecRow): RecBetween {
-  const statusRow = row.rec_status[0] ?? null;
+  const statusRow = embedOne(row.rec_status);
   return {
     id: row.id,
     note: row.note,

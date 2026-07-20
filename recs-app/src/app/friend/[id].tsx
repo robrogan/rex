@@ -9,21 +9,8 @@ import {
   useRecsBetween,
   type RecBetween,
 } from '../../lib/friends';
-import type { RecStatusValue } from '../../types/database';
+import { REACTION_GLYPH, STATUS_LABEL } from '../../lib/status';
 import { colors, fonts, radii, spacing, type } from '../../lib/theme';
-
-const STATUS_LABEL: Record<RecStatusValue, string> = {
-  to_read: 'To read',
-  started: 'Started',
-  finished: 'Finished',
-  not_for_me: 'Not for me',
-};
-
-const REACTION_GLYPH: Record<string, string> = {
-  loved: '❤️',
-  liked: '👍',
-  not_for_me: '🙅',
-};
 
 /** S11 — Friend profile with the "recs between us" affordance (brief A5, U14). */
 export default function FriendProfile() {
