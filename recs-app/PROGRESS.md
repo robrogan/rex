@@ -6,7 +6,7 @@
 | A2 Design system | ✅ Done 2026-07-19 | 8 components in `src/components/` (`Avatar`, `TabPill`, `PrimaryButton`/`SecondaryButton`, `SearchBar`, `TagChip`, `RecBadge`, `BookCard`) + barrel `index.ts`, matched to the Figma MVP Drafts `mvp/*` kit and the original Home/Detail card. Hidden `/dev/components` gallery renders every state. Theme reconciled (violet card outline, `description` 16/24, kit-accurate `radii`/`type` tokens). tsc + eslint clean; `expo export --platform web` bundles `/dev/components`. See "A2 design system built" below. |
 | A3 Backend | ✅ Done 2026-07-19 | SQL migrations (schema/RLS/triggers/hardening), seed (2 users + 5 books), `push-fanout` Edge Function stub, `config.toml`; client wiring `lib/supabase.ts` + `lib/auth.tsx` (email OTP) + React Query + typed `types/database.ts`; functional OTP sign-in. **Live Supabase project connected** (ref `mipdevkjokgaamnulqvr`), migrations 1-5 + seed applied directly via the Supabase MCP and verified (row counts match seed exactly, triggers fire). Test logins in `recs-app/TEST_LOGINS.local.md` (gitignored, not in repo — ask Rob if you need them). See "Supabase backend connected & hardened" below. |
 | A4 Search/detail | ⬜ | |
-| A5 Friends/send | ⬜ | |
+| A5 Friends/send | 🟡 Partial 2026-07-19 | **Friends-connection half done** (built parallel to A4, no file overlap): `lib/friends.ts` data layer + S7 `(tabs)/friends.tsx` (invite code share/copy, connect-by-code via `redeem_invite_code`, friends list) + S11 `friend/[id].tsx` (recs-between-us, U14). Added `expo-clipboard`. tsc + eslint clean; web export bundles `/friends` + `/friend/[id]`; queries verified against live seed (Rob↔Leul). **Deferred to post-A4:** S6 send-a-rec share sheet + U15 "Recommended to…" (both hang off A4's book detail). See "A5 friends foundation built" below. |
 | A6 TBR/status | ⬜ | |
 | A7 Notifications | ⬜ | |
 | A9 Web share pages | ⬜ | |
@@ -74,3 +74,25 @@ Reusable component library in `recs-app/src/components/`, matched to the Figma *
 **Config fix (pre-existing A3 gap):** excluded `supabase/functions` (the Deno edge function) from `tsconfig.json` and `eslint.config.js` — it's checked by Deno, not the Expo toolchain. Without this, root `tsc`/`eslint` failed on `Deno` globals + `https://esm.sh` imports.
 
 **Verified:** `tsc --noEmit` clean; `eslint .` clean; `expo export --platform web` bundles all 21 routes incl. `/dev/components` (server-rendered with no error). The final pixel-level side-by-side vs Figma is a device/Expo-Go check for Rob — it needs the real native font rendering.
+
+---
+
+## A5 friends foundation built — added 2026-07-19
+
+The **connection half of brief A5** (U3/U4/U14), built on branch `a5-friends` **in parallel with A4** (search/detail) — deliberately zero file overlap with A4's `search.tsx` / `item/[id].tsx` / `lib/googleBooks.ts`. Theme-token-only, reuses A2 components.
+
+**Data layer — `src/lib/friends.ts`** (React Query over Supabase, typed via `types/database.ts`):
+- `useMyProfile()` — my `users` row (invite code for S7).
+- `useFriends()` — my `friendships` rows → the "other" user ids → their `users` rows (all reads scoped by existing RLS). Sorted by name.
+- `useRedeemInviteCode()` — mutation calling the A3 `redeem_invite_code(code)` RPC (uppercases input to match its `upper(trim())`); invalidates `['friends']`; the RPC's raised exceptions surface as friendly inline errors.
+- `useRecsBetween(friendId)` (U14) — `recommendations` filtered with `.or(and(...),and(...))` for both directions, nested `items` + `rec_status`, split into `{ sent, received }` each carrying current status/reaction.
+
+**S7 — `src/app/(tabs)/friends.tsx`** (replaced placeholder): invite-code card with native **Share** (RN `Share`) + **Copy** (`expo-clipboard`); connect-by-code input (auto-uppercase, maxLength 6) with success/error states; friends list rows (`Avatar` + name) deep-linking to `/friend/[id]`; loading/empty/error states throughout.
+
+**S11 — `src/app/friend/[id].tsx`** (replaced placeholder): friend header (`Avatar` + name from the cached friends list, sets the stack header title via `<Stack.Screen>`); two groups "You sent {name}" / "{name} sent you", each a compact cover-thumb row with title/author/note and a status pill (To read / Started / Finished / Not for me, + reaction glyph on finish). Per-group empty states.
+
+**Dependency added:** `expo-clipboard` (`npx expo install`, SDK-57-pinned, Expo Go compatible) for the copy-code button.
+
+**Deferred to post-A4** (both hang off A4's book-detail screen): S6 send-a-rec share sheet + success toast, and the U15 "Recommended to…" affordance.
+
+**Verified:** `tsc --noEmit` clean; `eslint .` clean (lone warning is in generated `.expo/types/router.d.ts`, gitignored); `expo export --platform web` bundles `/friends` + `/friend/[id]`. Query correctness confirmed against the **live** seed via the Supabase MCP: invite codes `ROB123`/`LEUL42`; `useRecsBetween(Rob↔Leul)` = You sent → *Butter*, they sent → *Oathbringer* (both `to_read`); the null-sender self-add is correctly excluded from the pair view. On-device Expo Go check (fonts, native Share sheet) is Rob's to run with a seeded login from `TEST_LOGINS.local.md`.
