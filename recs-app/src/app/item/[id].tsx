@@ -4,9 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PrimaryButton, TagChip } from '../../components';
+import { PrimaryButton, RecBadge, TagChip } from '../../components';
 import { fetchVolume, type BookVolume } from '../../lib/googleBooks';
 import { addToTbr } from '../../lib/items';
+import { useRecommendedTo } from '../../lib/send';
 import { supabase } from '../../lib/supabase';
 import { colors, radii, spacing, type } from '../../lib/theme';
 import type { Database } from '../../types/database';
@@ -52,6 +53,9 @@ export default function ItemDetail() {
     mutationFn: () => addToTbr(book!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tbr'] }),
   });
+
+  // U15 "Recommended to…" — only DB-backed items can have recs (skip fresh gb: results).
+  const { data: recommendedTo } = useRecommendedTo(isGb ? undefined : id);
 
   if (isLoading) {
     return (
@@ -99,7 +103,12 @@ export default function ItemDetail() {
           </View>
         ) : null}
 
-        {/* U15 "Recommended to…" / who-recommended-this affordance — added in A5. */}
+        {recommendedTo && recommendedTo.length > 0 ? (
+          <RecBadge
+            recommenders={recommendedTo.map((r) => ({ name: r.name, uri: r.uri }))}
+            label={`Recommended to ${recommendedTo.map((r) => r.name).join(', ')}`}
+          />
+        ) : null}
 
         {book.description ? <Text style={type.description}>{book.description}</Text> : null}
 
@@ -113,8 +122,8 @@ export default function ItemDetail() {
           {addTbr.isError ? (
             <Text style={type.body}>Couldn’t add — try again.</Text>
           ) : null}
-          <Link href="/share" style={type.action}>
-            → Share (S6)
+          <Link href={{ pathname: '/share', params: { item: id } }} style={type.action}>
+            → Send to a friend (S6)
           </Link>
           <Link href="/status" style={type.action}>
             → Update status (S9)
